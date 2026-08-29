@@ -28,14 +28,40 @@ def load_data():
         range=RANGE_RESPONSES,
     ).execute()
     rows = resp.get("values", [])
-    df = pd.DataFrame(rows[1:], columns=rows[0]) if rows else pd.DataFrame()
+
+    if not rows:
+        df = pd.DataFrame()
+    else:
+        header = rows[0]
+        n_cols = len(header)
+        data_rows = []
+        for r in rows[1:]:
+            # Normalize each row to the same number of columns
+            if len(r) < n_cols:
+                r = r + [""] * (n_cols - len(r))
+            elif len(r) > n_cols:
+                r = r[:n_cols]
+            data_rows.append(r)
+        df = pd.DataFrame(data_rows, columns=header)
 
     loc = client.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID,
         range=RANGE_LOCATION,
     ).execute()
     loc_rows = loc.get("values", [])
-    df_location = pd.DataFrame(loc_rows[1:], columns=loc_rows[0]) if loc_rows else pd.DataFrame()
+    if not loc_rows:
+        df_location = pd.DataFrame()
+    else:
+        loc_header = loc_rows[0]
+        n_loc_cols = len(loc_header)
+        loc_data = []
+        for r in loc_rows[1:]:
+            if len(r) < n_loc_cols:
+                r = r + [""] * (n_loc_cols - len(r))
+            elif len(r) > n_loc_cols:
+                r = r[:n_loc_cols]
+            loc_data.append(r)
+        df_location = pd.DataFrame(loc_data, columns=loc_header)
 
     return df, df_location
 
@@ -47,12 +73,10 @@ def save_marks_and_remarks(row_index_0based, marks, remarks):
     marks_col_idx = cols.index("Marks")
     remarks_col_idx = cols.index("Remarks")
 
-    # Build full row
     full_row = df.iloc[row_index_0based].tolist()
     full_row[marks_col_idx] = str(marks)
     full_row[remarks_col_idx] = str(remarks)
 
-    # Sheet row number: header is row 1, data starts at row 2
     sheet_row = row_index_0based + 2
     range_name = f"{SHEET_RESPONSES_TITLE}!{sheet_row}:{sheet_row}"
 
@@ -79,7 +103,8 @@ if CATEGORY_COL not in df.columns:
     st.stop()
 
 # Generate Application IDs if empty
-if df["Application ID"].isna().all() or (df["Application ID"].astype(str).str.strip() == "").all():
+app_id_col = df["Application ID"].astype(str).str.strip()
+if app_id_col.isna().all() or (app_id_col == "").all():
     df["Application ID"] = ["C" + str(i).zfill(3) for i in range(1, len(df) + 1)]
 
 # Sidebar filters
