@@ -73,6 +73,42 @@ def load_data():
 
     return df, df_location
 
+def backfill_application_ids(df):
+    client = build_client()
+    header = list(df.columns)
+    app_id_col_idx = header.index("Application ID")
+
+    rows_to_write = []
+    for i, row in df.iterrows():
+        app_id = (row["Application ID"] or "").strip()
+        if not app_id:
+            # Compute expected ID based on data row index
+            expected_id = "C" + str(i + 1).zfill(3)
+            full_row = row.tolist()
+            full_row[app_id_col_idx] = expected_id
+            # Convert to plain strings
+            full_row = [str(v) if v is not None else "" for v in full_row]
+            rows_to_write.append((i, full_row))
+
+    if not rows_to_write:
+        return
+
+    # Build batch update body
+    data = []
+    for i, full_row in rows_to_write:
+        sheet_row = i + 2  # header is row 1
+        range_name = f"{SHEET_RESPONSES_TITLE}!{sheet_row}:{sheet_row}"
+        data.append({
+            "range": range_name,
+            "values": [full_row],
+        })
+
+    body = {"data": data, "valueInputOption": "RAW"}
+    client.spreadsheets().values().batchUpdate(
+        spreadsheetId=SPREADSHEET_ID,
+        body=body,
+    ).execute()
+
 def save_marks_and_remarks(orig_idx_0based, marks, remarks):
     client = build_client()
     df, _ = load_data()
@@ -115,10 +151,18 @@ for col in [CATEGORY_COL, DEGREE_COL, COURSE_LEVEL_COL, NAME_COL, STATE_COL, DIS
         st.error(f"Column '{col}' not found. Check header name.")
         st.stop()
 
-# Generate Application IDs if empty
+# Backfill Application IDs once if needed
 app_id_col = df["Application ID"].astype(str).str.strip()
 if app_id_col.isna().all() or (app_id_col == "").all():
-    df["Application ID"] = ["C" + str(i).zfill(3) for i in range(1, len(df) + 1)]
+    backfill_application_ids(df)
+    # Reload to get updated values
+    df, df_location = load_data()
+
+# Generate in-memory IDs if still any blank (safety)
+df["Application ID"] = df["Application ID"].astype(str).str.strip()
+for i in range(len(df)):
+    if not df.at[i, "Application ID"] or df.at[i, "Application ID"] == "":
+        df.at[i, "Application ID"] = "C" + str(i + 1).zfill(3)
 
 # Sidebar filters
 st.sidebar.title("Filters")
