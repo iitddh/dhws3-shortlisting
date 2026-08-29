@@ -10,6 +10,7 @@ RANGE_LOCATION = "location_mapping!A:ZZ"
 SHEET_RESPONSES_TITLE = "Form Responses 1"
 
 CATEGORY_COL = "15. Are you applying as a"
+DEGREE_COL = "7. Last degree attained"
 
 @st.cache_resource
 def build_client():
@@ -36,7 +37,6 @@ def load_data():
         n_cols = len(header)
         data_rows = []
         for r in rows[1:]:
-            # Normalize each row to the same number of columns
             if len(r) < n_cols:
                 r = r + [""] * (n_cols - len(r))
             elif len(r) > n_cols:
@@ -102,6 +102,10 @@ if CATEGORY_COL not in df.columns:
     st.error(f"Column '{CATEGORY_COL}' not found. Check header name.")
     st.stop()
 
+if DEGREE_COL not in df.columns:
+    st.error(f"Column '{DEGREE_COL}' not found. Check header name.")
+    st.stop()
+
 # Generate Application IDs if empty
 app_id_col = df["Application ID"].astype(str).str.strip()
 if app_id_col.isna().all() or (app_id_col == "").all():
@@ -109,13 +113,22 @@ if app_id_col.isna().all() or (app_id_col == "").all():
 
 # Sidebar filters
 st.sidebar.title("Filters")
-categories = ["All"] + sorted(df[CATEGORY_COL].dropna().unique().tolist())
-selected_cat = st.sidebar.selectbox("Category", categories)
 
+# Category filter
+categories = ["All"] + sorted(df[CATEGORY_COL].dropna().unique().tolist())
+selected_cat = st.sidebar.selectbox("Category", categories, key="cat")
+
+# Last degree filter
+degrees = ["All"] + sorted(df[DEGREE_COL].dropna().unique().tolist())
+selected_degree = st.sidebar.selectbox("Last degree attained", degrees, key="deg")
+
+df_filtered = df.copy()
 if selected_cat != "All":
-    df_filtered = df[df[CATEGORY_COL] == selected_cat].reset_index(drop=True)
-else:
-    df_filtered = df.reset_index(drop=True)
+    df_filtered = df_filtered[df_filtered[CATEGORY_COL] == selected_cat]
+if selected_degree != "All":
+    df_filtered = df_filtered[df_filtered[DEGREE_COL] == selected_degree]
+
+df_filtered = df_filtered.reset_index(drop=True)
 
 st.write(f"Showing {len(df_filtered)} of {len(df)} applications")
 
