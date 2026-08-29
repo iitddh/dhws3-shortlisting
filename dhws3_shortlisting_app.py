@@ -2,6 +2,9 @@ import streamlit as st
 
 st.title("Secrets test")
 
+# Force an obvious runtime line to confirm the app is executing
+st.write("App is running")
+
 try:
     sa = st.secrets["service_account"]
     st.write("Keys in service_account:", list(sa.keys()))
