@@ -169,7 +169,7 @@ if not df_filtered.empty:
             degree_counts.columns = ["Degree", "Count"]
             st.bar_chart(degree_counts.set_index("Degree"))
 
-    st.subheader("Discipline distribution")
+    st.subheader("Discipline")
     if DISCIPLINE_COL in df_filtered.columns:
         discipline_counts = df_filtered[DISCIPLINE_COL].value_counts().reset_index()
         discipline_counts.columns = ["Discipline", "Count"]
@@ -192,15 +192,27 @@ if df_filtered.empty:
     st.warning("No applications match the selected filters.")
     st.stop()
 
-# Select application
-app_options = df_filtered["Application ID"].tolist()
-selected_app = st.selectbox("Select application", app_options)
+# Navigation state
+if "idx" not in st.session_state or st.session_state.get("_last_len") != len(df_filtered):
+    st.session_state.idx = 0
+    st.session_state._last_len = len(df_filtered)
 
-# Find row in original df
+# Prev / Next buttons (top)
+col_prev, col_next = st.columns(2)
+with col_prev:
+    if st.button("← Previous", disabled=(st.session_state.idx == 0)):
+        st.session_state.idx -= 1
+        st.rerun()
+with col_next:
+    if st.button("Next →", disabled=(st.session_state.idx == len(df_filtered) - 1)):
+        st.session_state.idx += 1
+        st.rerun()
+
+selected_app = df_filtered["Application ID"].iloc[st.session_state.idx]
 row_in_df = int(df[df["Application ID"] == selected_app].index[0])
 row_display = df.iloc[row_in_df]
 
-st.subheader(f"Application {selected_app}")
+st.subheader(f"Application {selected_app} ({st.session_state.idx + 1} / {len(df_filtered)})")
 
 # Show all fields in a readable way
 st.write("### Details")
@@ -228,3 +240,15 @@ if st.button("Save marks and remarks"):
     save_marks_and_remarks(row_in_df, marks_input, remarks_input)
     st.success("Saved! Reloading...")
     st.rerun()
+
+# Prev / Next buttons (bottom)
+st.divider()
+col_prev2, col_next2 = st.columns(2)
+with col_prev2:
+    if st.button("← Previous", key="prev2", disabled=(st.session_state.idx == 0)):
+        st.session_state.idx -= 1
+        st.rerun()
+with col_next2:
+    if st.button("Next →", key="next2", disabled=(st.session_state.idx == len(df_filtered) - 1)):
+        st.session_state.idx += 1
+        st.rerun()
