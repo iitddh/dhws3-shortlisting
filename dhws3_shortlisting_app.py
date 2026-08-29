@@ -85,6 +85,9 @@ def save_marks_and_remarks(orig_idx_0based, marks, remarks):
     row[marks_col_idx] = str(marks)
     row[remarks_col_idx] = str(remarks)
 
+    # Convert all values to plain Python strings (JSON-serializable)
+    row = [str(v) if v is not None else "" for v in row]
+
     # Sheet row number: header is row 1, data starts at row 2
     sheet_row = orig_idx_0based + 2
     range_name = f"{SHEET_RESPONSES_TITLE}!{sheet_row}:{sheet_row}"
