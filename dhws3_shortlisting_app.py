@@ -123,9 +123,10 @@ selected_degree = st.sidebar.selectbox("Last degree attained", degrees, key="deg
 # Text search (name, email, any field)
 search_text = st.sidebar.text_input("Search (name, email, etc.)", value="", key="search")
 
-# Marks filter
+# Marks filter - only applied if user changes from defaults
 marks_min = st.sidebar.number_input("Min marks", min_value=0, max_value=10, value=0, key="mmin")
 marks_max = st.sidebar.number_input("Max marks", min_value=0, max_value=10, value=10, key="mmax")
+apply_marks_filter = (marks_min != 0) or (marks_max != 10)
 
 df_filtered = df.copy()
 
@@ -146,10 +147,10 @@ if search_text.strip():
     )
     df_filtered = df_filtered[mask]
 
-# Marks filter
-# Convert Marks to numeric, non-numeric -> NaN
-marks_numeric = pd.to_numeric(df_filtered["Marks"], errors="coerce")
-df_filtered = df_filtered[(marks_numeric >= marks_min) & (marks_numeric <= marks_max)]
+# Marks filter (only if user changed defaults)
+if apply_marks_filter:
+    marks_numeric = pd.to_numeric(df_filtered["Marks"], errors="coerce")
+    df_filtered = df_filtered[(marks_numeric >= marks_min) & (marks_numeric <= marks_max)]
 
 df_filtered = df_filtered.reset_index(drop=True)
 
