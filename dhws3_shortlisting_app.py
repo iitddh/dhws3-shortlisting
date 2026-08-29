@@ -1,15 +1,16 @@
 import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import pandas as pd
+from googleapiclient.errors import HttpError
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "YOUR_SPREADSHEET_ID"  # <-- replace with your real Sheet ID
 RANGE_RESPONSES = "Form Responses 1!A:ZZ"
 RANGE_LOCATION = "Location!A:ZZ"
 
-@st.cache_resource
-def load_sheets():
+st.title("DHWS3 Shortlisting App (debug)")
+
+try:
     creds = service_account.Credentials.from_service_account_info(
         st.secrets["service_account"],
         scopes=SCOPES,
@@ -21,6 +22,7 @@ def load_sheets():
         range=RANGE_RESPONSES,
     ).execute()
     rows = resp.get("values", [])
+    import pandas as pd
     df_responses = pd.DataFrame(rows[1:], columns=rows[0]) if rows else pd.DataFrame()
 
     loc = client.spreadsheets().values().get(
@@ -30,14 +32,15 @@ def load_sheets():
     loc_rows = loc.get("values", [])
     df_location = pd.DataFrame(loc_rows[1:], columns=loc_rows[0]) if loc_rows else pd.DataFrame()
 
-    return df_responses, df_location
+    st.write("Responses shape:", df_responses.shape)
+    st.write("Location shape:", df_location.shape)
+    st.dataframe(df_responses)
+    st.dataframe(df_location)
 
-df_responses, df_location = load_sheets()
-
-st.title("DHWS3 Shortlisting App")
-
-st.write("Responses shape:", df_responses.shape)
-st.write("Location shape:", df_location.shape)
-
-st.dataframe(df_responses)
-st.dataframe(df_location)
+except HttpError as e:
+    st.error("HttpError occurred:")
+    st.write("Status:", e.resp.status)
+    st.write("Reason:", e.reason if hasattr(e, "reason") else "unknown")
+    st.write("Content:", str(e.content))
+except Exception as e:
+    st.error(f"Other error: {e}")
