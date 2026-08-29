@@ -4,9 +4,9 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "YOUR_SPREADSHEET_ID"  # <-- replace with your real Sheet ID
+SPREADSHEET_ID = "1bhK-_vyRhcubcl-bey1VuiggYoV1K9PBLfrVhGtvyCE"  # <-- replace with your real Sheet ID
 RANGE_RESPONSES = "Form Responses 1!A:ZZ"
-RANGE_LOCATION = "Location!A:ZZ"
+RANGE_LOCATION = "location_mapping!A:ZZ"
 
 st.title("DHWS3 Shortlisting App (debug)")
 
