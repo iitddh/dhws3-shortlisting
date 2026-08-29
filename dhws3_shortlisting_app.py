@@ -11,6 +11,7 @@ SHEET_RESPONSES_TITLE = "Form Responses 1"
 
 CATEGORY_COL = "15. Are you applying as a"
 DEGREE_COL = "7. Last degree attained"
+COURSE_LEVEL_COL = "16. Which course / programme level are you currently pursuing?"
 NAME_COL = "1. Full name"
 STATE_COL = "4. State / Union Territory of travel origin"
 DISCIPLINE_COL = "9. Graduation discipline / area of study"
@@ -106,7 +107,7 @@ for col in ["Application ID", "Marks", "Remarks"]:
         st.error(f"Column '{col}' not found in 'Form Responses 1'. Please add it.")
         st.stop()
 
-for col in [CATEGORY_COL, DEGREE_COL, NAME_COL, STATE_COL, DISCIPLINE_COL]:
+for col in [CATEGORY_COL, DEGREE_COL, COURSE_LEVEL_COL, NAME_COL, STATE_COL, DISCIPLINE_COL]:
     if col not in df.columns:
         st.error(f"Column '{col}' not found. Check header name.")
         st.stop()
@@ -127,6 +128,10 @@ selected_cat = st.sidebar.selectbox("Category", categories, key="cat")
 degrees = ["All"] + sorted(df[DEGREE_COL].dropna().unique().tolist())
 selected_degree = st.sidebar.selectbox("Last degree attained", degrees, key="deg")
 
+# Course / programme level filter
+course_levels = ["All"] + sorted(df[COURSE_LEVEL_COL].dropna().unique().tolist())
+selected_course_level = st.sidebar.selectbox("Course / programme level", course_levels, key="course")
+
 # Text search (name, email, any field)
 search_text = st.sidebar.text_input("Search (name, email, etc.)", value="", key="search")
 
@@ -139,6 +144,10 @@ if selected_cat != "All":
 # Degree
 if selected_degree != "All":
     df_filtered = df_filtered[df_filtered[DEGREE_COL] == selected_degree]
+
+# Course level
+if selected_course_level != "All":
+    df_filtered = df_filtered[df_filtered[COURSE_LEVEL_COL] == selected_course_level]
 
 # Text search across all columns
 if search_text.strip():
