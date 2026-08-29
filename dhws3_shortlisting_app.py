@@ -11,6 +11,7 @@ SHEET_RESPONSES_TITLE = "Form Responses 1"
 
 CATEGORY_COL = "15. Are you applying as a"
 DEGREE_COL = "7. Last degree attained"
+NAME_COL = "1. Full name"
 
 @st.cache_resource
 def build_client():
@@ -98,13 +99,10 @@ for col in ["Application ID", "Marks", "Remarks"]:
         st.error(f"Column '{col}' not found in 'Form Responses 1'. Please add it.")
         st.stop()
 
-if CATEGORY_COL not in df.columns:
-    st.error(f"Column '{CATEGORY_COL}' not found. Check header name.")
-    st.stop()
-
-if DEGREE_COL not in df.columns:
-    st.error(f"Column '{DEGREE_COL}' not found. Check header name.")
-    st.stop()
+for col in [CATEGORY_COL, DEGREE_COL, NAME_COL]:
+    if col not in df.columns:
+        st.error(f"Column '{col}' not found. Check header name.")
+        st.stop()
 
 # Generate Application IDs if empty
 app_id_col = df["Application ID"].astype(str).str.strip()
@@ -122,11 +120,36 @@ selected_cat = st.sidebar.selectbox("Category", categories, key="cat")
 degrees = ["All"] + sorted(df[DEGREE_COL].dropna().unique().tolist())
 selected_degree = st.sidebar.selectbox("Last degree attained", degrees, key="deg")
 
+# Text search (name, email, any field)
+search_text = st.sidebar.text_input("Search (name, email, etc.)", value="", key="search")
+
+# Marks filter
+marks_min = st.sidebar.number_input("Min marks", min_value=0, max_value=10, value=0, key="mmin")
+marks_max = st.sidebar.number_input("Max marks", min_value=0, max_value=10, value=10, key="mmax")
+
 df_filtered = df.copy()
+
+# Category
 if selected_cat != "All":
     df_filtered = df_filtered[df_filtered[CATEGORY_COL] == selected_cat]
+
+# Degree
 if selected_degree != "All":
     df_filtered = df_filtered[df_filtered[DEGREE_COL] == selected_degree]
+
+# Text search across all columns
+if search_text.strip():
+    q = search_text.lower()
+    mask = df_filtered.apply(
+        lambda row: any(q in str(v).lower() for v in row.values),
+        axis=1
+    )
+    df_filtered = df_filtered[mask]
+
+# Marks filter
+# Convert Marks to numeric, non-numeric -> NaN
+marks_numeric = pd.to_numeric(df_filtered["Marks"], errors="coerce")
+df_filtered = df_filtered[(marks_numeric >= marks_min) & (marks_numeric <= marks_max)]
 
 df_filtered = df_filtered.reset_index(drop=True)
 
