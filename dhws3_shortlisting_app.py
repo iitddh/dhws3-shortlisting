@@ -12,6 +12,9 @@ SHEET_RESPONSES_TITLE = "Form Responses 1"
 CATEGORY_COL = "15. Are you applying as a"
 DEGREE_COL = "7. Last degree attained"
 NAME_COL = "1. Full name"
+STATE_COL = "4. State / Union Territory of travel origin"
+DISCIPLINE_COL = "9. Graduation discipline / area of study"
+HS_LANG_COL = "14. Which languages were used as the medium of instruction in your high school? Select all that apply."
 
 @st.cache_resource
 def build_client():
@@ -99,7 +102,7 @@ for col in ["Application ID", "Marks", "Remarks"]:
         st.error(f"Column '{col}' not found in 'Form Responses 1'. Please add it.")
         st.stop()
 
-for col in [CATEGORY_COL, DEGREE_COL, NAME_COL]:
+for col in [CATEGORY_COL, DEGREE_COL, NAME_COL, STATE_COL, DISCIPLINE_COL]:
     if col not in df.columns:
         st.error(f"Column '{col}' not found. Check header name.")
         st.stop()
@@ -123,11 +126,6 @@ selected_degree = st.sidebar.selectbox("Last degree attained", degrees, key="deg
 # Text search (name, email, any field)
 search_text = st.sidebar.text_input("Search (name, email, etc.)", value="", key="search")
 
-# Marks filter - only applied if user changes from defaults
-marks_min = st.sidebar.number_input("Min marks", min_value=0, max_value=10, value=0, key="mmin")
-marks_max = st.sidebar.number_input("Max marks", min_value=0, max_value=10, value=10, key="mmax")
-apply_marks_filter = (marks_min != 0) or (marks_max != 10)
-
 df_filtered = df.copy()
 
 # Category
@@ -147,52 +145,28 @@ if search_text.strip():
     )
     df_filtered = df_filtered[mask]
 
-# Marks filter (only if user changed defaults)
-if apply_marks_filter:
-    marks_numeric = pd.to_numeric(df_filtered["Marks"], errors="coerce")
-    df_filtered = df_filtered[(marks_numeric >= marks_min) & (marks_numeric <= marks_max)]
-
 df_filtered = df_filtered.reset_index(drop=True)
 
 st.write(f"Showing {len(df_filtered)} of {len(df)} applications")
 
-if df_filtered.empty:
-    st.warning("No applications match the selected filters.")
-    st.stop()
+# Visualizations
+st.header("Overview")
 
-# Select application
-app_options = df_filtered["Application ID"].tolist()
-selected_app = st.selectbox("Select application", app_options)
+if not df_filtered.empty:
+    col1, col2 = st.columns(2)
 
-# Find row in original df
-row_in_df = int(df[df["Application ID"] == selected_app].index[0])
-row_display = df.iloc[row_in_df]
+    with col1:
+        st.subheader("State / UT distribution")
+        if STATE_COL in df_filtered.columns:
+            state_counts = df_filtered[STATE_COL].value_counts().reset_index()
+            state_counts.columns = ["State / UT", "Count"]
+            st.bar_chart(state_counts.set_index("State / UT"))
 
-st.subheader(f"Application {selected_app}")
+    with col2:
+        st.subheader("Last degree attained")
+        if DEGREE_COL in df_filtered.columns:
+            degree_counts = df_filtered[DEGREE_COL].value_counts().reset_index()
+            degree_counts.columns = ["Degree", "Count"]
+            st.bar_chart(degree_counts.set_index("Degree"))
 
-# Show all fields in a readable way
-st.write("### Details")
-for col in df.columns:
-    if col in ["Application ID", "Marks", "Remarks"]:
-        continue
-    st.write(f"**{col}**: {row_display[col]}")
-
-# Review section
-st.write("### Review")
-current_marks = row_display["Marks"]
-current_remarks = row_display["Remarks"]
-
-try:
-    marks_init = int(float(current_marks)) if pd.notna(current_marks) and current_marks not in ["", None] else 0
-except Exception:
-    marks_init = 0
-
-remarks_init = str(current_remarks) if pd.notna(current_remarks) and current_remarks not in ["", None] else ""
-
-marks_input = st.number_input("Marks (out of 10)", min_value=0, max_value=10, value=marks_init)
-remarks_input = st.text_area("Remarks", value=remarks_init)
-
-if st.button("Save marks and remarks"):
-    save_marks_and_remarks(row_in_df, marks_input, remarks_input)
-    st.success("Saved! Reloading...")
-    st.rerun()
+    st.subheader("Discipline
