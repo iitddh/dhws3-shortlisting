@@ -2,6 +2,7 @@ import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import pandas as pd
+import html
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1bhK-_vyRhcubcl-bey1VuiggYoV1K9PBLfrVhGtvyCE"
@@ -17,6 +18,50 @@ STATE_COL = "4. State / Union Territory of travel origin"
 DISCIPLINE_COL = "9. Graduation discipline / area of study"
 HS_LANG_COL = "14. Which languages were used as the medium of instruction in your high school? Select all that apply."
 
+st.set_page_config(
+    page_title="DHWS3 Shortlisting App",
+    layout="wide",
+)
+
+st.markdown(
+    """
+    <style>
+    .question-label {
+        background-color: #eaf2ff;
+        border-left: 5px solid #2f6fed;
+        color: #174a9c;
+        font-weight: 700;
+        padding: 0.55rem 0.75rem;
+        margin-top: 0.9rem;
+        margin-bottom: 0.15rem;
+        border-radius: 4px;
+        line-height: 1.35;
+    }
+
+    .applicant-response {
+        background-color: #fff8e6;
+        border-left: 5px solid #e0a000;
+        color: #222222;
+        padding: 0.65rem 0.75rem;
+        margin-bottom: 0.7rem;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        line-height: 1.45;
+    }
+
+    .legend-box {
+        background-color: #f7f7f7;
+        border: 1px solid #dddddd;
+        border-radius: 5px;
+        padding: 0.6rem 0.8rem;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 @st.cache_resource
 def build_client():
@@ -31,11 +76,12 @@ def build_client():
 def load_data():
     client = build_client()
 
-    resp = client.spreadsheets().values().get(
+    response = client.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID,
         range=RANGE_RESPONSES,
     ).execute()
-    rows = resp.get("values", [])
+
+    rows = response.get("values", [])
 
     if not rows:
         df = pd.DataFrame()
@@ -46,38 +92,46 @@ def load_data():
 
         for row in rows[1:]:
             row = list(row)
+
             if len(row) < n_cols:
                 row.extend([""] * (n_cols - len(row)))
             elif len(row) > n_cols:
                 row = row[:n_cols]
+
             data_rows.append(row)
 
         df = pd.DataFrame(data_rows, columns=header)
 
     df["_orig_idx"] = list(range(len(df)))
 
-    loc = client.spreadsheets().values().get(
+    location_response = client.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID,
         range=RANGE_LOCATION,
     ).execute()
-    loc_rows = loc.get("values", [])
 
-    if not loc_rows:
+    location_rows = location_response.get("values", [])
+
+    if not location_rows:
         df_location = pd.DataFrame()
     else:
-        loc_header = loc_rows[0]
-        n_loc_cols = len(loc_header)
-        loc_data = []
+        location_header = location_rows[0]
+        n_location_cols = len(location_header)
+        location_data = []
 
-        for row in loc_rows[1:]:
+        for row in location_rows[1:]:
             row = list(row)
-            if len(row) < n_loc_cols:
-                row.extend([""] * (n_loc_cols - len(row)))
-            elif len(row) > n_loc_cols:
-                row = row[:n_loc_cols]
-            loc_data.append(row)
 
-        df_location = pd.DataFrame(loc_data, columns=loc_header)
+            if len(row) < n_location_cols:
+                row.extend([""] * (n_location_cols - len(row)))
+            elif len(row) > n_location_cols:
+                row = row[:n_location_cols]
+
+            location_data.append(row)
+
+        df_location = pd.DataFrame(
+            location_data,
+            columns=location_header,
+        )
 
     return df, df_location
 
@@ -95,22 +149,30 @@ def column_letter(index_0based):
 
 def backfill_application_ids(df):
     client = build_client()
+
     header = list(df.columns)
     app_id_col_idx = header.index("Application ID")
+    app_id_col = column_letter(app_id_col_idx)
 
     data = []
 
     for i, row in df.iterrows():
-        current_id = "" if pd.isna(row["Application ID"]) else str(row["Application ID"]).strip()
+        current_id = (
+            ""
+            if pd.isna(row["Application ID"])
+            else str(row["Application ID"]).strip()
+        )
 
         if not current_id:
             expected_id = "C" + str(i + 1).zfill(3)
-            app_id_col = column_letter(app_id_col_idx)
             sheet_row = i + 2
 
             data.append(
                 {
-                    "range": f"{SHEET_RESPONSES_TITLE}!{app_id_col}{sheet_row}",
+                    "range": (
+                        f"{SHEET_RESPONSES_TITLE}!"
+                        f"{app_id_col}{sheet_row}"
+                    ),
                     "values": [[expected_id]],
                 }
             )
@@ -135,23 +197,31 @@ def save_marks_and_remarks(orig_idx_0based, marks, remarks):
     client = build_client()
     df, _ = load_data()
 
-    cols = list(df.columns)
-    marks_col_idx = cols.index("Marks")
-    remarks_col_idx = cols.index("Remarks")
+    columns = list(df.columns)
+
+    marks_col_idx = columns.index("Marks")
+    remarks_col_idx = columns.index("Remarks")
 
     marks_col = column_letter(marks_col_idx)
     remarks_col = column_letter(remarks_col_idx)
+
     sheet_row = orig_idx_0based + 2
 
     body = {
         "valueInputOption": "RAW",
         "data": [
             {
-                "range": f"{SHEET_RESPONSES_TITLE}!{marks_col}{sheet_row}",
+                "range": (
+                    f"{SHEET_RESPONSES_TITLE}!"
+                    f"{marks_col}{sheet_row}"
+                ),
                 "values": [[str(marks)]],
             },
             {
-                "range": f"{SHEET_RESPONSES_TITLE}!{remarks_col}{sheet_row}",
+                "range": (
+                    f"{SHEET_RESPONSES_TITLE}!"
+                    f"{remarks_col}{sheet_row}"
+                ),
                 "values": [[str(remarks)]],
             },
         ],
@@ -178,26 +248,54 @@ def normalize_marks(series):
         errors="coerce",
     )
 
-    is_marked = marks_text.ne("") & marks_numeric.notna()
+    is_marked = (
+        marks_text.ne("")
+        & marks_numeric.notna()
+    )
 
     return marks_text, marks_numeric, is_marked
 
 
-# Load data
+def display_question_response(question, response):
+    question_text = html.escape(str(question))
+
+    if pd.isna(response) or str(response).strip() == "":
+        response_text = "[No response provided]"
+    else:
+        response_text = html.escape(str(response))
+
+    st.markdown(
+        f"""
+        <div class="question-label">
+            {question_text}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+        <div class="applicant-response">
+            {response_text}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 df, df_location = load_data()
 
 st.title("DHWS3 Shortlisting App")
 
-# Ensure required columns exist
-for col in ["Application ID", "Marks", "Remarks"]:
-    if col not in df.columns:
+for required_column in ["Application ID", "Marks", "Remarks"]:
+    if required_column not in df.columns:
         st.error(
-            f"Column '{col}' not found in 'Form Responses 1'. "
-            "Please add it."
+            f"Column '{required_column}' was not found in "
+            "'Form Responses 1'. Please add it."
         )
         st.stop()
 
-for col in [
+for required_column in [
     CATEGORY_COL,
     DEGREE_COL,
     COURSE_LEVEL_COL,
@@ -205,11 +303,14 @@ for col in [
     STATE_COL,
     DISCIPLINE_COL,
 ]:
-    if col not in df.columns:
-        st.error(f"Column '{col}' not found. Check the exact header name.")
+    if required_column not in df.columns:
+        st.error(
+            f"Column '{required_column}' was not found. "
+            "Check the exact header name."
+        )
         st.stop()
 
-# Backfill blank application IDs in the spreadsheet
+
 app_id_text = (
     df["Application ID"]
     .fillna("")
@@ -221,7 +322,7 @@ if app_id_text.eq("").any():
     backfill_application_ids(df)
     df, df_location = load_data()
 
-# Generate in-memory IDs only as a safety fallback
+
 df["Application ID"] = (
     df["Application ID"]
     .fillna("")
@@ -233,35 +334,53 @@ for i in range(len(df)):
     if df.at[i, "Application ID"] == "":
         df.at[i, "Application ID"] = "C" + str(i + 1).zfill(3)
 
-# Sidebar filters
+
 st.sidebar.title("Filters")
 
 categories = ["All"] + sorted(
-    df[CATEGORY_COL].dropna().astype(str).unique().tolist()
+    df[CATEGORY_COL]
+    .dropna()
+    .astype(str)
+    .unique()
+    .tolist()
 )
+
 selected_cat = st.sidebar.selectbox(
     "Category",
     categories,
     key="cat",
 )
 
+
 degrees = ["All"] + sorted(
-    df[DEGREE_COL].dropna().astype(str).unique().tolist()
+    df[DEGREE_COL]
+    .dropna()
+    .astype(str)
+    .unique()
+    .tolist()
 )
+
 selected_degree = st.sidebar.selectbox(
     "Last degree attained",
     degrees,
     key="deg",
 )
 
+
 course_levels = ["All"] + sorted(
-    df[COURSE_LEVEL_COL].dropna().astype(str).unique().tolist()
+    df[COURSE_LEVEL_COL]
+    .dropna()
+    .astype(str)
+    .unique()
+    .tolist()
 )
+
 selected_course_level = st.sidebar.selectbox(
     "Course / programme level",
     course_levels,
     key="course",
 )
+
 
 search_text = st.sidebar.text_input(
     "Search (name, email, etc.)",
@@ -269,11 +388,13 @@ search_text = st.sidebar.text_input(
     key="search",
 )
 
+
 review_status = st.sidebar.selectbox(
     "Review status",
     ["All", "Marked", "Unmarked"],
     key="review_status",
 )
+
 
 score_filter = st.sidebar.selectbox(
     "Score filter",
@@ -298,7 +419,7 @@ score_filter = st.sidebar.selectbox(
     key="score_filter",
 )
 
-# Apply filters
+
 df_filtered = df.copy()
 
 if selected_cat != "All":
@@ -317,17 +438,18 @@ if selected_course_level != "All":
     ]
 
 if search_text.strip():
-    q = search_text.lower()
+    query = search_text.lower()
 
-    mask = df_filtered.apply(
+    search_mask = df_filtered.apply(
         lambda row: any(
-            q in str(value).lower()
+            query in str(value).lower()
             for value in row.values
         ),
         axis=1,
     )
 
-    df_filtered = df_filtered[mask]
+    df_filtered = df_filtered[search_mask]
+
 
 marks_text, marks_numeric, is_marked = normalize_marks(
     df_filtered["Marks"]
@@ -339,14 +461,27 @@ if review_status == "Marked":
 elif review_status == "Unmarked":
     df_filtered = df_filtered[~is_marked]
 
-if score_filter != "All scores":
-    if score_filter in {
-        "0", "1", "2", "3", "4",
-        "5", "6", "7", "8", "9", "10",
-    }:
-        selected_score = int(score_filter)
-        score_mask = is_marked & marks_numeric.eq(selected_score)
 
+if score_filter != "All scores":
+    exact_scores = {
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+    }
+
+    if score_filter in exact_scores:
+        score_mask = (
+            is_marked
+            & marks_numeric.eq(int(score_filter))
+        )
     else:
         score_ranges = {
             "0–4": (0, 4),
@@ -356,6 +491,7 @@ if score_filter != "All scores":
         }
 
         minimum, maximum = score_ranges[score_filter]
+
         score_mask = (
             is_marked
             & marks_numeric.between(minimum, maximum)
@@ -363,13 +499,14 @@ if score_filter != "All scores":
 
     df_filtered = df_filtered[score_mask]
 
+
 df_filtered = df_filtered.reset_index(drop=True)
 
 st.write(
     f"Showing {len(df_filtered)} of {len(df)} applications"
 )
 
-# Visualizations
+
 st.header("Overview")
 
 if not df_filtered.empty:
@@ -377,56 +514,80 @@ if not df_filtered.empty:
 
     with col1:
         st.subheader("State / UT distribution")
+
         state_counts = (
             df_filtered[STATE_COL]
             .value_counts()
             .reset_index()
         )
+
         state_counts.columns = ["State / UT", "Count"]
-        st.bar_chart(state_counts.set_index("State / UT"))
+
+        st.bar_chart(
+            state_counts.set_index("State / UT")
+        )
 
     with col2:
         st.subheader("Last degree attained")
+
         degree_counts = (
             df_filtered[DEGREE_COL]
             .value_counts()
             .reset_index()
         )
+
         degree_counts.columns = ["Degree", "Count"]
-        st.bar_chart(degree_counts.set_index("Degree"))
+
+        st.bar_chart(
+            degree_counts.set_index("Degree")
+        )
 
     st.subheader("Discipline")
+
     discipline_counts = (
         df_filtered[DISCIPLINE_COL]
         .value_counts()
         .reset_index()
     )
+
     discipline_counts.columns = ["Discipline", "Count"]
-    st.bar_chart(discipline_counts.set_index("Discipline"))
+
+    st.bar_chart(
+        discipline_counts.set_index("Discipline")
+    )
 
     st.subheader("High school medium of instruction")
-    lang_counts = {}
+
+    language_counts = {}
 
     for value in df_filtered[HS_LANG_COL].dropna():
         for language in str(value).split(","):
             language = language.strip()
+
             if language:
-                lang_counts[language] = (
-                    lang_counts.get(language, 0) + 1
+                language_counts[language] = (
+                    language_counts.get(language, 0) + 1
                 )
 
-    if lang_counts:
-        lang_df = pd.DataFrame(
-            list(lang_counts.items()),
+    if language_counts:
+        language_df = pd.DataFrame(
+            list(language_counts.items()),
             columns=["Language", "Count"],
-        ).sort_values("Count", ascending=False)
-        st.bar_chart(lang_df.set_index("Language"))
+        ).sort_values(
+            "Count",
+            ascending=False,
+        )
+
+        st.bar_chart(
+            language_df.set_index("Language")
+        )
+
 
 if df_filtered.empty:
     st.info("No applications match the selected filters.")
     st.stop()
 
-# Reset navigation when filters change
+
 filter_signature = (
     selected_cat,
     selected_degree,
@@ -447,9 +608,12 @@ if "idx" not in st.session_state:
     st.session_state.idx = 0
 
 if st.session_state.idx >= len(df_filtered):
-    st.session_state.idx = max(0, len(df_filtered) - 1)
+    st.session_state.idx = max(
+        0,
+        len(df_filtered) - 1,
+    )
 
-# Top navigation
+
 col_prev, col_next = st.columns(2)
 
 with col_prev:
@@ -460,32 +624,66 @@ with col_prev:
         st.session_state.idx -= 1
         st.rerun()
 
+
 with col_next:
     if st.button(
         "Next →",
-        disabled=(st.session_state.idx == len(df_filtered) - 1),
+        disabled=(
+            st.session_state.idx
+            == len(df_filtered) - 1
+        ),
     ):
         st.session_state.idx += 1
         st.rerun()
 
-current_row = df_filtered.iloc[st.session_state.idx]
+
+current_row = df_filtered.iloc[
+    st.session_state.idx
+]
+
 selected_app = current_row["Application ID"]
 orig_idx = int(current_row["_orig_idx"])
 
 st.subheader(
     f"Application {selected_app} "
-    f"({st.session_state.idx + 1} / {len(df_filtered)})"
+    f"({st.session_state.idx + 1} / "
+    f"{len(df_filtered)})"
 )
 
-# Details
-st.write("### Details")
 
-for col in df.columns:
-    if col in ["Application ID", "Marks", "Remarks", "_orig_idx"]:
+st.markdown(
+    """
+    <div class="legend-box">
+        <span style="color:#174a9c;font-weight:700;">
+            Blue = form question
+        </span>
+        &nbsp; | &nbsp;
+        <span style="color:#9a6a00;font-weight:700;">
+            Yellow = applicant response
+        </span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+st.write("### Application details")
+
+for column in df.columns:
+    if column in [
+        "Application ID",
+        "Marks",
+        "Remarks",
+        "_orig_idx",
+    ]:
         continue
-    st.write(f"**{col}**: {current_row[col]}")
 
-# Review
+    display_question_response(
+        column,
+        current_row[column],
+    )
+
+
 st.write("### Review")
 
 current_marks = current_row["Marks"]
@@ -503,16 +701,21 @@ if current_marks_text == "":
 else:
     try:
         marks_init = int(float(current_marks_text))
-        st.caption(f"Status: Marked — {current_marks_text}/10")
+        st.caption(
+            f"Status: Marked — "
+            f"{current_marks_text}/10"
+        )
     except (TypeError, ValueError):
         marks_init = 0
         st.caption("Status: Unmarked")
+
 
 remarks_init = (
     ""
     if pd.isna(current_remarks)
     else str(current_remarks)
 )
+
 
 marks_input = st.number_input(
     "Marks (out of 10)",
@@ -522,10 +725,12 @@ marks_input = st.number_input(
     step=1,
 )
 
+
 remarks_input = st.text_area(
     "Remarks",
     value=remarks_init,
 )
+
 
 if st.button("Save marks and remarks"):
     save_marks_and_remarks(
@@ -533,11 +738,13 @@ if st.button("Save marks and remarks"):
         marks_input,
         remarks_input,
     )
+
     st.success("Saved! Reloading...")
     st.rerun()
 
-# Bottom navigation
+
 st.divider()
+
 col_prev2, col_next2 = st.columns(2)
 
 with col_prev2:
@@ -549,11 +756,15 @@ with col_prev2:
         st.session_state.idx -= 1
         st.rerun()
 
+
 with col_next2:
     if st.button(
         "Next →",
         key="next2",
-        disabled=(st.session_state.idx == len(df_filtered) - 1),
+        disabled=(
+            st.session_state.idx
+            == len(df_filtered) - 1
+        ),
     ):
         st.session_state.idx += 1
         st.rerun()
