@@ -324,6 +324,41 @@ def display_question_response(question, response):
     )
 
 
+def display_column_chart(data, category_column, value_column, title):
+    chart = (
+        alt.Chart(data)
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                f"{category_column}:N",
+                sort="-y",
+                title=None,
+                axis=alt.Axis(labelAngle=-45),
+            ),
+            y=alt.Y(
+                f"{value_column}:Q",
+                title="Applications",
+            ),
+            tooltip=[
+                alt.Tooltip(
+                    f"{category_column}:N",
+                    title=category_column,
+                ),
+                alt.Tooltip(
+                    f"{value_column}:Q",
+                    title="Applications",
+                ),
+            ],
+        )
+        .properties(
+            title=title,
+            height=400,
+        )
+    )
+
+    st.altair_chart(chart, use_container_width=True)
+
+
 def display_horizontal_bar_chart(
     data,
     category_column,
@@ -356,14 +391,55 @@ def display_horizontal_bar_chart(
         )
         .properties(
             title=title,
-            height=max(250, len(data) * 28),
+            height=max(250, len(data) * 30),
         )
     )
 
-    st.altair_chart(
-        chart,
-        use_container_width=True,
+    st.altair_chart(chart, use_container_width=True)
+
+
+def display_score_histogram(score_values):
+    score_df = pd.DataFrame(
+        {
+            "Score": score_values.astype(float),
+        }
     )
+
+    chart = (
+        alt.Chart(score_df)
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                "Score:Q",
+                bin=alt.Bin(
+                    step=1,
+                    extent=[0, 11],
+                ),
+                title="Score",
+            ),
+            y=alt.Y(
+                "count():Q",
+                title="Applications",
+            ),
+            tooltip=[
+                alt.Tooltip(
+                    "Score:Q",
+                    bin=True,
+                    title="Score range",
+                ),
+                alt.Tooltip(
+                    "count():Q",
+                    title="Applications",
+                ),
+            ],
+        )
+        .properties(
+            title="Score distribution",
+            height=400,
+        )
+    )
+
+    st.altair_chart(chart, use_container_width=True)
 
 
 df, df_location = load_data()
@@ -566,7 +642,7 @@ if not df_filtered.empty:
 
     state_counts.columns = ["State / UT", "Count"]
 
-    display_horizontal_bar_chart(
+    display_column_chart(
         state_counts,
         "State / UT",
         "Count",
@@ -583,7 +659,7 @@ if not df_filtered.empty:
 
     degree_counts.columns = ["Degree", "Count"]
 
-    display_horizontal_bar_chart(
+    display_column_chart(
         degree_counts,
         "Degree",
         "Count",
@@ -600,7 +676,7 @@ if not df_filtered.empty:
 
     discipline_counts.columns = ["Discipline", "Count"]
 
-    display_horizontal_bar_chart(
+    display_column_chart(
         discipline_counts,
         "Discipline",
         "Count",
@@ -653,7 +729,7 @@ if not df_filtered.empty:
             ascending=False,
         )
 
-        display_horizontal_bar_chart(
+        display_column_chart(
             language_df,
             "Language",
             "Count",
@@ -669,29 +745,11 @@ if not df_filtered.empty:
 
     if score_values.empty:
         st.info(
-            "No marked applications are available for the score chart."
+            "No marked applications are available "
+            "for the score histogram."
         )
     else:
-        score_counts = (
-            score_values
-            .astype(int)
-            .value_counts()
-            .reindex(range(0, 11), fill_value=0)
-            .sort_index()
-            .reset_index()
-        )
-
-        score_counts.columns = [
-            "Score",
-            "Applications",
-        ]
-
-        display_horizontal_bar_chart(
-            score_counts,
-            "Score",
-            "Applications",
-            "Score distribution",
-        )
+        display_score_histogram(score_values)
 
 
 if df_filtered.empty:
