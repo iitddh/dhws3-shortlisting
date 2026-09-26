@@ -19,10 +19,6 @@ NAME_COL = "1. Full name"
 STATE_COL = "4. State / Union Territory of travel origin"
 DISCIPLINE_COL = "9. Graduation discipline / area of study"
 HS_LANG_COL = "14. Which languages were used as the medium of instruction in your high school? Select all that apply."
-
-# Replace this with the exact gender-column header if your sheet has a
-# separate gender field.
-GENDER_COL = "Current position"
 LOCATION_TYPE_COL = "Location type"
 
 st.set_page_config(
@@ -389,7 +385,6 @@ for required_column in [
     NAME_COL,
     STATE_COL,
     DISCIPLINE_COL,
-    GENDER_COL,
     LOCATION_TYPE_COL,
 ]:
     if required_column not in df.columns:
@@ -610,27 +605,6 @@ if not df_filtered.empty:
         "Discipline",
         "Count",
         "Discipline",
-    )
-
-    st.subheader("Gender distribution")
-
-    gender_counts = (
-        df_filtered[GENDER_COL]
-        .fillna("")
-        .astype(str)
-        .str.strip()
-        .replace("", "Not provided")
-        .value_counts()
-        .reset_index()
-    )
-
-    gender_counts.columns = ["Gender", "Count"]
-
-    display_horizontal_bar_chart(
-        gender_counts,
-        "Gender",
-        "Count",
-        "Gender distribution",
     )
 
     st.subheader("Metro / non-metro distribution")
