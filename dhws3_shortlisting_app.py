@@ -325,6 +325,8 @@ def display_question_response(question, response):
 
 
 def display_column_chart(data, category_column, value_column, title):
+    chart_height = max(400, len(data) * 42)
+
     chart = (
         alt.Chart(data)
         .mark_bar()
@@ -333,11 +335,20 @@ def display_column_chart(data, category_column, value_column, title):
                 f"{category_column}:N",
                 sort="-y",
                 title=None,
-                axis=alt.Axis(labelAngle=-45),
+                axis=alt.Axis(
+                    labelAngle=-35,
+                    labelOverlap=False,
+                    labelFontSize=12,
+                    labelLimit=300,
+                    labelPadding=5,
+                ),
             ),
             y=alt.Y(
                 f"{value_column}:Q",
                 title="Applications",
+                axis=alt.Axis(
+                    labelFontSize=12,
+                ),
             ),
             tooltip=[
                 alt.Tooltip(
@@ -352,7 +363,7 @@ def display_column_chart(data, category_column, value_column, title):
         )
         .properties(
             title=title,
-            height=400,
+            height=chart_height,
         )
     )
 
@@ -365,6 +376,8 @@ def display_horizontal_bar_chart(
     value_column,
     title,
 ):
+    chart_height = max(250, len(data) * 42)
+
     chart = (
         alt.Chart(data)
         .mark_bar()
@@ -372,11 +385,20 @@ def display_horizontal_bar_chart(
             x=alt.X(
                 f"{value_column}:Q",
                 title="Applications",
+                axis=alt.Axis(
+                    labelFontSize=12,
+                ),
             ),
             y=alt.Y(
                 f"{category_column}:N",
                 sort="-x",
                 title=None,
+                axis=alt.Axis(
+                    labelOverlap=False,
+                    labelFontSize=13,
+                    labelLimit=400,
+                    labelPadding=5,
+                ),
             ),
             tooltip=[
                 alt.Tooltip(
@@ -391,7 +413,7 @@ def display_horizontal_bar_chart(
         )
         .properties(
             title=title,
-            height=max(250, len(data) * 30),
+            height=chart_height,
         )
     )
 
@@ -416,10 +438,18 @@ def display_score_histogram(score_values):
                     extent=[0, 11],
                 ),
                 title="Score",
+                axis=alt.Axis(
+                    labelFontSize=13,
+                    tickCount=11,
+                    labelOverlap=False,
+                ),
             ),
             y=alt.Y(
                 "count():Q",
                 title="Applications",
+                axis=alt.Axis(
+                    labelFontSize=12,
+                ),
             ),
             tooltip=[
                 alt.Tooltip(
@@ -809,6 +839,11 @@ current_row = df_filtered.iloc[st.session_state.idx]
 selected_app = current_row["Application ID"]
 orig_idx = int(current_row["_orig_idx"])
 
+st.markdown(
+    '<div id="application-start"></div>',
+    unsafe_allow_html=True,
+)
+
 st.subheader(
     f"Application {selected_app} "
     f"({st.session_state.idx + 1} / "
@@ -932,3 +967,27 @@ with col_next2:
     ):
         st.session_state.idx += 1
         st.rerun()
+
+
+st.markdown("---")
+
+st.markdown(
+    """
+    <a href="#application-start">
+        <button style="
+            width: 100%;
+            padding: 0.65rem;
+            border: 1px solid #2f6fed;
+            border-radius: 5px;
+            background-color: #eaf2ff;
+            color: #174a9c;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        ">
+            ↑ Back to beginning of this application
+        </button>
+    </a>
+    """,
+    unsafe_allow_html=True,
+)
