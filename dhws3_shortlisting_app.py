@@ -20,6 +20,8 @@ STATE_COL = "4. State / Union Territory of travel origin"
 DISCIPLINE_COL = "9. Graduation discipline / area of study"
 HS_LANG_COL = "14. Which languages were used as the medium of instruction in your high school? Select all that apply."
 LOCATION_TYPE_COL = "Metro/Nonmetro"
+COUNTRY_COL = "Country"
+SPONSORED_COL = "Are you applying as a sponsored applicant?"
 
 st.set_page_config(
     page_title="DHWS3 Shortlisting App",
@@ -346,9 +348,7 @@ def display_column_chart(data, category_column, value_column, title):
             y=alt.Y(
                 f"{value_column}:Q",
                 title="Applications",
-                axis=alt.Axis(
-                    labelFontSize=12,
-                ),
+                axis=alt.Axis(labelFontSize=12),
             ),
             tooltip=[
                 alt.Tooltip(
@@ -385,9 +385,7 @@ def display_horizontal_bar_chart(
             x=alt.X(
                 f"{value_column}:Q",
                 title="Applications",
-                axis=alt.Axis(
-                    labelFontSize=12,
-                ),
+                axis=alt.Axis(labelFontSize=12),
             ),
             y=alt.Y(
                 f"{category_column}:N",
@@ -422,9 +420,7 @@ def display_horizontal_bar_chart(
 
 def display_score_histogram(score_values):
     score_df = pd.DataFrame(
-        {
-            "Score": score_values.astype(float),
-        }
+        {"Score": score_values.astype(float)}
     )
 
     chart = (
@@ -433,10 +429,7 @@ def display_score_histogram(score_values):
         .encode(
             x=alt.X(
                 "Score:Q",
-                bin=alt.Bin(
-                    step=1,
-                    extent=[0, 11],
-                ),
+                bin=alt.Bin(step=1, extent=[0, 11]),
                 title="Score",
                 axis=alt.Axis(
                     labelFontSize=13,
@@ -447,9 +440,7 @@ def display_score_histogram(score_values):
             y=alt.Y(
                 "count():Q",
                 title="Applications",
-                axis=alt.Axis(
-                    labelFontSize=12,
-                ),
+                axis=alt.Axis(labelFontSize=12),
             ),
             tooltip=[
                 alt.Tooltip(
@@ -492,6 +483,8 @@ for required_column in [
     STATE_COL,
     DISCIPLINE_COL,
     LOCATION_TYPE_COL,
+    COUNTRY_COL,
+    SPONSORED_COL,
 ]:
     if required_column not in df.columns:
         st.error(
@@ -528,13 +521,8 @@ for i in range(len(df)):
 st.sidebar.title("Filters")
 
 categories = ["All"] + sorted(
-    df[CATEGORY_COL]
-    .dropna()
-    .astype(str)
-    .unique()
-    .tolist()
+    df[CATEGORY_COL].dropna().astype(str).unique().tolist()
 )
-
 selected_cat = st.sidebar.selectbox(
     "Category",
     categories,
@@ -543,13 +531,8 @@ selected_cat = st.sidebar.selectbox(
 
 
 degrees = ["All"] + sorted(
-    df[DEGREE_COL]
-    .dropna()
-    .astype(str)
-    .unique()
-    .tolist()
+    df[DEGREE_COL].dropna().astype(str).unique().tolist()
 )
-
 selected_degree = st.sidebar.selectbox(
     "Last degree attained",
     degrees,
@@ -558,13 +541,8 @@ selected_degree = st.sidebar.selectbox(
 
 
 course_levels = ["All"] + sorted(
-    df[COURSE_LEVEL_COL]
-    .dropna()
-    .astype(str)
-    .unique()
-    .tolist()
+    df[COURSE_LEVEL_COL].dropna().astype(str).unique().tolist()
 )
-
 selected_course_level = st.sidebar.selectbox(
     "Course / programme level",
     course_levels,
@@ -596,6 +574,20 @@ score_range = st.sidebar.slider(
 )
 
 
+country_filter = st.sidebar.selectbox(
+    "Country",
+    ["All", "India", "Outside India"],
+    key="country_filter",
+)
+
+
+sponsored_filter = st.sidebar.selectbox(
+    "Sponsored applicant",
+    ["All", "Yes", "No"],
+    key="sponsored_filter",
+)
+
+
 df_filtered = df.copy()
 
 if selected_cat != "All":
@@ -611,6 +603,33 @@ if selected_degree != "All":
 if selected_course_level != "All":
     df_filtered = df_filtered[
         df_filtered[COURSE_LEVEL_COL] == selected_course_level
+    ]
+
+if country_filter != "All":
+    country_values = (
+        df_filtered[COUNTRY_COL]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.casefold()
+    )
+
+    if country_filter == "India":
+        df_filtered = df_filtered[country_values == "india"]
+    else:
+        df_filtered = df_filtered[country_values != "india"]
+
+if sponsored_filter != "All":
+    sponsored_values = (
+        df_filtered[SPONSORED_COL]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.casefold()
+    )
+
+    df_filtered = df_filtered[
+        sponsored_values == sponsored_filter.casefold()
     ]
 
 if search_text.strip():
@@ -633,7 +652,6 @@ marks_text, marks_numeric, is_marked = normalize_marks(
 
 if review_status == "Marked":
     df_filtered = df_filtered[is_marked]
-
 elif review_status == "Unmarked":
     df_filtered = df_filtered[~is_marked]
 
@@ -669,7 +687,6 @@ if not df_filtered.empty:
         .value_counts()
         .reset_index()
     )
-
     state_counts.columns = ["State / UT", "Count"]
 
     display_column_chart(
@@ -686,7 +703,6 @@ if not df_filtered.empty:
         .value_counts()
         .reset_index()
     )
-
     degree_counts.columns = ["Degree", "Count"]
 
     display_column_chart(
@@ -703,7 +719,6 @@ if not df_filtered.empty:
         .value_counts()
         .reset_index()
     )
-
     discipline_counts.columns = ["Discipline", "Count"]
 
     display_column_chart(
@@ -724,11 +739,7 @@ if not df_filtered.empty:
         .value_counts()
         .reset_index()
     )
-
-    location_type_counts.columns = [
-        "Location type",
-        "Count",
-    ]
+    location_type_counts.columns = ["Location type", "Count"]
 
     display_horizontal_bar_chart(
         location_type_counts,
@@ -754,10 +765,7 @@ if not df_filtered.empty:
         language_df = pd.DataFrame(
             list(language_counts.items()),
             columns=["Language", "Count"],
-        ).sort_values(
-            "Count",
-            ascending=False,
-        )
+        ).sort_values("Count", ascending=False)
 
         display_column_chart(
             language_df,
@@ -794,6 +802,8 @@ filter_signature = (
     search_text,
     review_status,
     score_range,
+    country_filter,
+    sponsored_filter,
 )
 
 if (
