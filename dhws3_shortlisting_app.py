@@ -4,6 +4,7 @@ from googleapiclient.discovery import build
 import pandas as pd
 import html
 import re
+import altair as alt
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1bhK-_vyRhcubcl-bey1VuiggYoV1K9PBLfrVhGtvyCE"
@@ -18,6 +19,11 @@ NAME_COL = "1. Full name"
 STATE_COL = "4. State / Union Territory of travel origin"
 DISCIPLINE_COL = "9. Graduation discipline / area of study"
 HS_LANG_COL = "14. Which languages were used as the medium of instruction in your high school? Select all that apply."
+
+# Replace this with the exact gender-column header if your sheet has a
+# separate gender field.
+GENDER_COL = "Current position"
+LOCATION_TYPE_COL = "Location type"
 
 st.set_page_config(
     page_title="DHWS3 Shortlisting App",
@@ -322,6 +328,48 @@ def display_question_response(question, response):
     )
 
 
+def display_horizontal_bar_chart(
+    data,
+    category_column,
+    value_column,
+    title,
+):
+    chart = (
+        alt.Chart(data)
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                f"{value_column}:Q",
+                title="Applications",
+            ),
+            y=alt.Y(
+                f"{category_column}:N",
+                sort="-x",
+                title=None,
+            ),
+            tooltip=[
+                alt.Tooltip(
+                    f"{category_column}:N",
+                    title=category_column,
+                ),
+                alt.Tooltip(
+                    f"{value_column}:Q",
+                    title="Applications",
+                ),
+            ],
+        )
+        .properties(
+            title=title,
+            height=max(250, len(data) * 28),
+        )
+    )
+
+    st.altair_chart(
+        chart,
+        use_container_width=True,
+    )
+
+
 df, df_location = load_data()
 
 st.title("DHWS3 Shortlisting App")
@@ -341,6 +389,8 @@ for required_column in [
     NAME_COL,
     STATE_COL,
     DISCIPLINE_COL,
+    GENDER_COL,
+    LOCATION_TYPE_COL,
 ]:
     if required_column not in df.columns:
         st.error(
@@ -521,8 +571,11 @@ if not df_filtered.empty:
 
     state_counts.columns = ["State / UT", "Count"]
 
-    st.bar_chart(
-        state_counts.set_index("State / UT")
+    display_horizontal_bar_chart(
+        state_counts,
+        "State / UT",
+        "Count",
+        "State / UT distribution",
     )
 
     st.subheader("Last degree attained")
@@ -535,8 +588,11 @@ if not df_filtered.empty:
 
     degree_counts.columns = ["Degree", "Count"]
 
-    st.bar_chart(
-        degree_counts.set_index("Degree")
+    display_horizontal_bar_chart(
+        degree_counts,
+        "Degree",
+        "Count",
+        "Last degree attained",
     )
 
     st.subheader("Discipline")
@@ -549,8 +605,56 @@ if not df_filtered.empty:
 
     discipline_counts.columns = ["Discipline", "Count"]
 
-    st.bar_chart(
-        discipline_counts.set_index("Discipline")
+    display_horizontal_bar_chart(
+        discipline_counts,
+        "Discipline",
+        "Count",
+        "Discipline",
+    )
+
+    st.subheader("Gender distribution")
+
+    gender_counts = (
+        df_filtered[GENDER_COL]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .replace("", "Not provided")
+        .value_counts()
+        .reset_index()
+    )
+
+    gender_counts.columns = ["Gender", "Count"]
+
+    display_horizontal_bar_chart(
+        gender_counts,
+        "Gender",
+        "Count",
+        "Gender distribution",
+    )
+
+    st.subheader("Metro / non-metro distribution")
+
+    location_type_counts = (
+        df_filtered[LOCATION_TYPE_COL]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .replace("", "Not provided")
+        .value_counts()
+        .reset_index()
+    )
+
+    location_type_counts.columns = [
+        "Location type",
+        "Count",
+    ]
+
+    display_horizontal_bar_chart(
+        location_type_counts,
+        "Location type",
+        "Count",
+        "Metro / non-metro distribution",
     )
 
     st.subheader("High school medium of instruction")
@@ -575,8 +679,11 @@ if not df_filtered.empty:
             ascending=False,
         )
 
-        st.bar_chart(
-            language_df.set_index("Language")
+        display_horizontal_bar_chart(
+            language_df,
+            "Language",
+            "Count",
+            "High school medium of instruction",
         )
 
     st.subheader("Score distribution")
@@ -597,18 +704,19 @@ if not df_filtered.empty:
             .value_counts()
             .reindex(range(0, 11), fill_value=0)
             .sort_index()
+            .reset_index()
         )
 
-        score_chart_df = pd.DataFrame(
-            {
-                "Score": score_counts.index,
-                "Applications": score_counts.values,
-            }
-        ).set_index("Score")
+        score_counts.columns = [
+            "Score",
+            "Applications",
+        ]
 
-        st.bar_chart(
-            score_chart_df,
-            y="Applications",
+        display_horizontal_bar_chart(
+            score_counts,
+            "Score",
+            "Applications",
+            "Score distribution",
         )
 
 
