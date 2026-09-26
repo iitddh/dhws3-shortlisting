@@ -3,6 +3,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import pandas as pd
 import html
+import re
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1bhK-_vyRhcubcl-bey1VuiggYoV1K9PBLfrVhGtvyCE"
@@ -45,8 +46,15 @@ st.markdown(
         padding: 0.65rem 0.75rem;
         margin-bottom: 0.7rem;
         border-radius: 4px;
-        white-space: pre-wrap;
+        white-space: normal;
         line-height: 1.45;
+        overflow-wrap: anywhere;
+    }
+
+    .applicant-response a {
+        color: #0757a5;
+        text-decoration: underline;
+        font-weight: 600;
     }
 
     .legend-box {
@@ -204,7 +212,6 @@ def save_marks_and_remarks(orig_idx_0based, marks, remarks):
 
     marks_col = column_letter(marks_col_idx)
     remarks_col = column_letter(remarks_col_idx)
-
     sheet_row = orig_idx_0based + 2
 
     body = {
@@ -256,13 +263,51 @@ def normalize_marks(series):
     return marks_text, marks_numeric, is_marked
 
 
-def display_question_response(question, response):
-    question_text = html.escape(str(question))
-
+def make_clickable_response(response):
     if pd.isna(response) or str(response).strip() == "":
-        response_text = "[No response provided]"
-    else:
-        response_text = html.escape(str(response))
+        return "[No response provided]"
+
+    response_text = str(response)
+
+    # Escape applicant text before inserting links.
+    escaped_text = html.escape(response_text, quote=True)
+
+    # Match HTTP and HTTPS URLs.
+    url_pattern = r"https?://[^\s<]+"
+
+    def replace_url(match):
+        matched_url = match.group(0)
+        trailing_punctuation = ""
+
+        # Do not include ordinary sentence punctuation in the link.
+        while matched_url and matched_url[-1] in ".,;:!?)]}":
+            trailing_punctuation = (
+                matched_url[-1] + trailing_punctuation
+            )
+            matched_url = matched_url[:-1]
+
+        safe_url = html.escape(matched_url, quote=True)
+
+        link = (
+            f'<a href="{safe_url}" target="_blank" '
+            f'rel="noopener noreferrer">{safe_url}</a>'
+        )
+
+        return link + trailing_punctuation
+
+    clickable_text = re.sub(
+        url_pattern,
+        replace_url,
+        escaped_text,
+    )
+
+    # Preserve applicant line breaks.
+    return clickable_text.replace("\n", "<br>")
+
+
+def display_question_response(question, response):
+    question_text = html.escape(str(question), quote=True)
+    response_html = make_clickable_response(response)
 
     st.markdown(
         f"""
@@ -276,7 +321,7 @@ def display_question_response(question, response):
     st.markdown(
         f"""
         <div class="applicant-response">
-            {response_text}
+            {response_html}
         </div>
         """,
         unsafe_allow_html=True,
@@ -624,7 +669,6 @@ with col_prev:
         st.session_state.idx -= 1
         st.rerun()
 
-
 with col_next:
     if st.button(
         "Next →",
@@ -637,10 +681,7 @@ with col_next:
         st.rerun()
 
 
-current_row = df_filtered.iloc[
-    st.session_state.idx
-]
-
+current_row = df_filtered.iloc[st.session_state.idx]
 selected_app = current_row["Application ID"]
 orig_idx = int(current_row["_orig_idx"])
 
@@ -755,7 +796,6 @@ with col_prev2:
     ):
         st.session_state.idx -= 1
         st.rerun()
-
 
 with col_next2:
     if st.button(
