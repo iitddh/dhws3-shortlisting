@@ -19,7 +19,7 @@ NAME_COL = "1. Full name"
 STATE_COL = "4. State / Union Territory of travel origin"
 DISCIPLINE_COL = "9. Graduation discipline / area of study"
 HS_LANG_COL = "14. Which languages were used as the medium of instruction in your high school? Select all that apply."
-LOCATION_TYPE_COL = "Location type"
+LOCATION_TYPE_COL = "Metro/Nonmetro"
 
 st.set_page_config(
     page_title="DHWS3 Shortlisting App",
