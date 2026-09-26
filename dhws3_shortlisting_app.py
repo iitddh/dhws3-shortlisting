@@ -511,37 +511,33 @@ st.write(
 st.header("Overview")
 
 if not df_filtered.empty:
-    col1, col2 = st.columns(2)
+    st.subheader("State / UT distribution")
 
-    with col1:
-        st.subheader("State / UT distribution")
+    state_counts = (
+        df_filtered[STATE_COL]
+        .value_counts()
+        .reset_index()
+    )
 
-        state_counts = (
-            df_filtered[STATE_COL]
-            .value_counts()
-            .reset_index()
-        )
+    state_counts.columns = ["State / UT", "Count"]
 
-        state_counts.columns = ["State / UT", "Count"]
+    st.bar_chart(
+        state_counts.set_index("State / UT")
+    )
 
-        st.bar_chart(
-            state_counts.set_index("State / UT")
-        )
+    st.subheader("Last degree attained")
 
-    with col2:
-        st.subheader("Last degree attained")
+    degree_counts = (
+        df_filtered[DEGREE_COL]
+        .value_counts()
+        .reset_index()
+    )
 
-        degree_counts = (
-            df_filtered[DEGREE_COL]
-            .value_counts()
-            .reset_index()
-        )
+    degree_counts.columns = ["Degree", "Count"]
 
-        degree_counts.columns = ["Degree", "Count"]
-
-        st.bar_chart(
-            degree_counts.set_index("Degree")
-        )
+    st.bar_chart(
+        degree_counts.set_index("Degree")
+    )
 
     st.subheader("Discipline")
 
@@ -581,6 +577,38 @@ if not df_filtered.empty:
 
         st.bar_chart(
             language_df.set_index("Language")
+        )
+
+    st.subheader("Score distribution")
+
+    score_values = pd.to_numeric(
+        df_filtered["Marks"],
+        errors="coerce",
+    ).dropna()
+
+    if score_values.empty:
+        st.info(
+            "No marked applications are available for the score chart."
+        )
+    else:
+        score_counts = (
+            score_values
+            .astype(int)
+            .value_counts()
+            .reindex(range(0, 11), fill_value=0)
+            .sort_index()
+        )
+
+        score_chart_df = pd.DataFrame(
+            {
+                "Score": score_counts.index,
+                "Applications": score_counts.values,
+            }
+        ).set_index("Score")
+
+        st.bar_chart(
+            score_chart_df,
+            y="Applications",
         )
 
 
