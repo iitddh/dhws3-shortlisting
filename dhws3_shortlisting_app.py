@@ -268,18 +268,13 @@ def make_clickable_response(response):
         return "[No response provided]"
 
     response_text = str(response)
-
-    # Escape applicant text before inserting links.
     escaped_text = html.escape(response_text, quote=True)
-
-    # Match HTTP and HTTPS URLs.
     url_pattern = r"https?://[^\s<]+"
 
     def replace_url(match):
         matched_url = match.group(0)
         trailing_punctuation = ""
 
-        # Do not include ordinary sentence punctuation in the link.
         while matched_url and matched_url[-1] in ".,;:!?)]}":
             trailing_punctuation = (
                 matched_url[-1] + trailing_punctuation
@@ -301,7 +296,6 @@ def make_clickable_response(response):
         escaped_text,
     )
 
-    # Preserve applicant line breaks.
     return clickable_text.replace("\n", "<br>")
 
 
@@ -441,27 +435,13 @@ review_status = st.sidebar.selectbox(
 )
 
 
-score_filter = st.sidebar.selectbox(
-    "Score filter",
-    [
-        "All scores",
-        "0",
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "10",
-        "0–4",
-        "5–6",
-        "7–8",
-        "9–10",
-    ],
-    key="score_filter",
+score_range = st.sidebar.slider(
+    "Score range",
+    min_value=0,
+    max_value=10,
+    value=(0, 10),
+    step=1,
+    key="score_range",
 )
 
 
@@ -507,40 +487,16 @@ elif review_status == "Unmarked":
     df_filtered = df_filtered[~is_marked]
 
 
-if score_filter != "All scores":
-    exact_scores = {
-        "0",
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "10",
-    }
+minimum_score, maximum_score = score_range
 
-    if score_filter in exact_scores:
-        score_mask = (
-            is_marked
-            & marks_numeric.eq(int(score_filter))
+if score_range != (0, 10):
+    score_mask = (
+        is_marked
+        & marks_numeric.between(
+            minimum_score,
+            maximum_score,
         )
-    else:
-        score_ranges = {
-            "0–4": (0, 4),
-            "5–6": (5, 6),
-            "7–8": (7, 8),
-            "9–10": (9, 10),
-        }
-
-        minimum, maximum = score_ranges[score_filter]
-
-        score_mask = (
-            is_marked
-            & marks_numeric.between(minimum, maximum)
-        )
+    )
 
     df_filtered = df_filtered[score_mask]
 
@@ -639,7 +595,7 @@ filter_signature = (
     selected_course_level,
     search_text,
     review_status,
-    score_filter,
+    score_range,
 )
 
 if (
